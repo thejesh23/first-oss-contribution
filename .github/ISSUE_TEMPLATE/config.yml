@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/thejesh23/first-oss-contribution/blob/main/CONTRIBUTING.md
+    about: Read this first if you're not sure how to make your practice PR.
