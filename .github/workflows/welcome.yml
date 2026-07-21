@@ -1,0 +1,29 @@
+name: Welcome First-Time Contributors
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            👋 Welcome, and thanks for opening your first issue here! Take a
+            look at [docs/etiquette.md](https://github.com/thejesh23/first-oss-contribution/blob/main/docs/etiquette.md)
+            for tips on what happens next.
+          pr-message: |
+            🎉 Congrats on opening your first pull request! An automated check
+            will verify your change in a moment, and if it looks good it'll
+            merge automatically. If not, you'll get a comment explaining what
+            to fix. See [docs/etiquette.md](https://github.com/thejesh23/first-oss-contribution/blob/main/docs/etiquette.md)
+            for what to expect.
