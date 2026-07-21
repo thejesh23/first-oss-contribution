@@ -30,15 +30,6 @@ Useful exactly at the moment described in
 a promising repo and an issue, and now you need to figure out how the
 codebase actually fits together before you touch anything.
 
-## Aider
-
-[aider.chat](https://aider.chat)
-
-An open-source, terminal-based AI pair programmer that's git-native — it
-proposes changes as commits you can review, diff, and undo. Good fit for the
-workflow this repo teaches: small, reviewable, well-described changes rather
-than large unreviewable ones.
-
 ## Continue
 
 [continue.dev](https://continue.dev)
