@@ -1,0 +1,103 @@
+name: Validate and Merge Contributor PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check only CONTRIBUTORS.md changed
+        id: files
+        run: |
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+          if [ "$CHANGED" != "CONTRIBUTORS.md" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "reason=This PR changes files other than CONTRIBUTORS.md, so it needs manual review." >> "$GITHUB_OUTPUT"
+          else
+            echo "safe=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check diff is append-only and well-formatted
+        if: steps.files.outputs.safe == 'true'
+        id: diff
+        run: |
+          set -e
+          DIFF=$(git diff "origin/${{ github.base_ref }}...HEAD" -- CONTRIBUTORS.md)
+
+          REMOVED=$(echo "$DIFF" | grep -E '^-[^-]' || true)
+          if [ -n "$REMOVED" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "reason=This PR removes or modifies existing lines in CONTRIBUTORS.md. Please only add a new line at the end." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ADDED=$(echo "$DIFF" | grep -E '^\+[^+]' | sed 's/^+//')
+          if [ -z "$ADDED" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "reason=No new lines were added to CONTRIBUTORS.md." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PATTERN='^- \[[^]]+\]\(https://github\.com/[A-Za-z0-9-]+\) - .+$'
+          BASE_CONTENT=$(git show "origin/${{ github.base_ref }}:CONTRIBUTORS.md")
+          BAD=0
+          DUP=0
+          while IFS= read -r LINE; do
+            [ -z "$LINE" ] && continue
+            if ! echo "$LINE" | grep -Eq "$PATTERN"; then
+              BAD=1
+              continue
+            fi
+            HANDLE_URL=$(echo "$LINE" | grep -oE 'https://github\.com/[A-Za-z0-9-]+')
+            if echo "$BASE_CONTENT" | grep -qF "$HANDLE_URL"; then
+              DUP=1
+            fi
+          done <<< "$ADDED"
+
+          if [ "$BAD" = "1" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "reason=One or more added lines don't match the required format: - [Name](https://github.com/handle) - short intro" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$DUP" = "1" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "reason=That GitHub handle is already listed in CONTRIBUTORS.md." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "safe=true" >> "$GITHUB_OUTPUT"
+
+      - name: Comment and block when unsafe
+        if: steps.files.outputs.safe == 'false' || steps.diff.outputs.safe == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reason = '${{ steps.files.outputs.reason }}${{ steps.diff.outputs.reason }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Thanks for the PR! This can't be auto-merged yet:\n\n${reason}\n\nA maintainer will take a look soon.`
+            });
+            core.setFailed('Needs manual review: ' + reason);
+
+      - name: Enable auto-merge
+        if: steps.files.outputs.safe == 'true' && steps.diff.outputs.safe == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.number }}"
