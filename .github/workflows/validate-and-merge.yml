@@ -1,7 +1,7 @@
 name: Validate and Merge Contributor PRs
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
     branches: [main]
 
@@ -13,9 +13,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout full history
+      - name: Checkout PR head with full history
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Check only CONTRIBUTORS.md changed
@@ -38,7 +39,7 @@ jobs:
           set -e
           DIFF=$(git diff "origin/${{ github.base_ref }}...HEAD" -- CONTRIBUTORS.md)
 
-          REMOVED=$(echo "$DIFF" | grep -E '^-[^-]' || true)
+          REMOVED=$(echo "$DIFF" | grep -E '^-' | grep -v '^--- ' || true)
           if [ -n "$REMOVED" ]; then
             echo "safe=false" >> "$GITHUB_OUTPUT"
             echo "reason=This PR removes or modifies existing lines in CONTRIBUTORS.md. Please only add a new line at the end." >> "$GITHUB_OUTPUT"
@@ -56,16 +57,22 @@ jobs:
           BASE_CONTENT=$(git show "origin/${{ github.base_ref }}:CONTRIBUTORS.md")
           BAD=0
           DUP=0
+          SEEN_NEW=""
           while IFS= read -r LINE; do
             [ -z "$LINE" ] && continue
             if ! echo "$LINE" | grep -Eq "$PATTERN"; then
               BAD=1
               continue
             fi
-            HANDLE_URL=$(echo "$LINE" | grep -oE 'https://github\.com/[A-Za-z0-9-]+')
-            if echo "$BASE_CONTENT" | grep -qF "$HANDLE_URL"; then
+            HANDLE_URL=$(echo "$LINE" | grep -oE 'https://github\.com/[A-Za-z0-9-]+' | head -1)
+            if echo "$BASE_CONTENT" | grep -qF "${HANDLE_URL})"; then
               DUP=1
             fi
+            if echo "$SEEN_NEW" | grep -qF "${HANDLE_URL})"; then
+              DUP=1
+            fi
+            SEEN_NEW="${SEEN_NEW}
+            ${HANDLE_URL})"
           done <<< "$ADDED"
 
           if [ "$BAD" = "1" ]; then
@@ -76,18 +83,18 @@ jobs:
 
           if [ "$DUP" = "1" ]; then
             echo "safe=false" >> "$GITHUB_OUTPUT"
-            echo "reason=That GitHub handle is already listed in CONTRIBUTORS.md." >> "$GITHUB_OUTPUT"
+            echo "reason=That GitHub handle is already listed in CONTRIBUTORS.md, or is duplicated within this PR." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "safe=true" >> "$GITHUB_OUTPUT"
 
       - name: Comment and block when unsafe
-        if: steps.files.outputs.safe == 'false' || steps.diff.outputs.safe == 'false'
+        if: always() && (steps.files.outputs.safe == 'false' || steps.diff.outputs.safe == 'false' || steps.files.outcome == 'failure' || steps.diff.outcome == 'failure')
         uses: actions/github-script@v7
         with:
           script: |
-            const reason = '${{ steps.files.outputs.reason }}${{ steps.diff.outputs.reason }}';
+            const reason = '${{ steps.files.outputs.reason }}${{ steps.diff.outputs.reason }}' || 'An unexpected error occurred while validating this PR.';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
