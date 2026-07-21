@@ -22,9 +22,9 @@ reviewers — is expected to help keep it that way.
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, open an issue tagged
-`conduct`, or if that doesn't feel safe, contact the maintainer directly via
-their GitHub profile. Reports will be handled discreetly.
+If you experience or witness unacceptable behavior, contact the maintainer
+directly via their GitHub profile, or open an issue and put `[conduct]` in
+the title. Reports will be handled discreetly.
 
 ## Enforcement
 
