@@ -13,6 +13,7 @@ one — fork it, add your name, and watch it actually get reviewed and merged.
 - [Finding your first issue](docs/finding-your-first-issue.md) — for after you've done the practice PR here
 - [Open source etiquette](docs/etiquette.md) — how to write a good PR and talk to maintainers
 - [GitHub Student Developer Pack](docs/student-pack.md) — free tools for students
+- [Helpful AI coding tools](docs/ai-coding-tools.md) — a personal shortlist for reading unfamiliar code and writing better PRs
 
 ## Who's contributed
 
